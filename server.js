@@ -1,105 +1,131 @@
-// server.js these are all the packages we used in this app
 const express = require("express");
 const mongoose = require("mongoose");
-const bodyParser = require("body-parser");
 const cors = require("cors");
-const multer = require("multer");
-const path = require("path");
 
 const app = express();
 const port = 5000;
 
-app.use(bodyParser.json());
 app.use(cors());
+app.use(express.json());
 
 // Connection to MongoDB
-// mongoose.connect(
-//   "mongodb url here",
-//   {
-//     useNewUrlParser: true,
-//     useUnifiedTopology: true,
-//   }
-// );
+mongoose.connect(
+  "mongodb url",
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  }
+);
+console.log("connected to mongodb database successfully");
 
 //schema have all the required fields we need
-const userSchema = new mongoose.Schema({
-  firstName: String,
-  lastName: String,
-  dateOfBirth: Date,
+const employeeSchema = new mongoose.Schema({
+  name: String,
+  number: Number,
   email: String,
-  residentialAddress: {
-    street1: String,
-    street2: String,
-  },
-  permanentAddress: {
-    street1: String,
-    street2: String,
-  },
-  fileDetails: {
-    fileName: String,
-    fileType: String,
-    uploadDocument: String,
-  },
+  id: String,
+  address: String,
+  designation: String,
+  joiningDate: Date,
+  gender: String,
+  experiences: [
+    {
+      companyName: String,
+      designation: String,
+      timePeriod: String,
+    },
+  ],
 });
 
-const User = mongoose.model("User", userSchema);
+const Employee = mongoose.model("Employee", employeeSchema);
 
-// File upload configuration using multer package it will upload file into the upload folder
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  //by this code below file name will be the original name which the user will upload
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
+app.get("/getuser", async (req, res) => {
+  userList = await Employee.find();
+  if (userList.lenght == 0) {
+    return res.status(404);
+  }
+  res.status(200).json(userList);
 });
 
-const upload = multer({ storage });
+
+
+
+app.delete("/userdelete/:id", async (req, res) => {
+  const resourceId = req.params.id;
+
+  if (!mongoose.Types.ObjectId.isValid(resourceId)) {
+    return res.status(400).json({ error: "Invalid ID" });
+  }
+
+  try {
+    // Find the resource by its ID and delete it
+    const deletedResource = await Employee.findByIdAndDelete(resourceId);
+
+    if (!deletedResource) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+    return res.status(200).json({ message: "Employee details deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+
+app.put("/userupdate/:id", async (req, res) => {
+  const resourceId = req.params.id;
+
+  if (!mongoose.Types.ObjectId.isValid(resourceId)) {
+    return res.status(400).json({ error: "Invalid ID" });
+  }
+
+  try {
+    // Find the resource by its ID and delete it
+    const deletedResource = await Employee.findByIdAndUpdate(resourceId, req.body);
+
+    if (!deletedResource) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+    return res.status(200).json({ message: "Employee updated successfully" });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+
 
 // Route for posting the information collected into the mongodb database
-app.post("/register", upload.array("uploadDocument"), async (req, res) => {
+app.post("/registers", async (req, res) => {
   try {
     const {
-      firstName,
-      lastName,
-      dateOfBirth,
+      name,
+      number,
       email,
-      residentialAddress: {
-        street1: residentialStreet1,
-        street2: residentialStreet2,
-      },
-      permanentAddress: {
-        street1: permanentStreet1,
-        street2: permanentStreet2,
-      },
-      fileDetails:fileDetails,
+      id,
+      address,
+      designation,
+      joiningDate,
+      gender,
+      experiences,
     } = req.body;
 
-    const files = req.files.map((file) => file.filename);
-
+    console.log(req.body);
     //below code will create a new document or user we can say in database
-    const user = new User({
-      firstName,
-      lastName,
-      dateOfBirth,
+    const data = new Employee({
+      name,
+      number,
       email,
-      residentialAddress: {
-        street1: residentialStreet1,
-        street2: residentialStreet2,
-      },
-      permanentAddress: {
-        street1: permanentStreet1,
-        street2: permanentStreet2,
-      },
-      fileDetails: {
-        ...fileDetails,
-        uploadDocuments: files,
-      },
+      id,
+      address,
+      designation,
+      joiningDate,
+      gender,
+      experiences,
     });
 
     //below code will save the information into the database and if there is some error found then it will show error message
-    await user.save();
+    await data.save();
     res.status(201).json({ message: "Registration successful!" });
   } catch (error) {
     res.status(500).json({ error: "Registration failed." });
